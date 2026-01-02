@@ -44,14 +44,15 @@ def run_validation_TimeSeries(model,validation_dl, device, num_examples, config,
             encoder_input_removed = batch['interpolation_noisy_TimeSeries'].to(device)  #(Batch,seq_len) --> index shape
             noise_std = batch["noise_std"]                                              #(Batch) --> float shape
             div_term = batch["div_term"].to(device)                                     #(Batch) --> float shape
-            min_value = batch["min_value"].to(device)                                   #(Batch) --> float shape
+            min_value = batch["min_value"].to(device)
+            time = torch.linspace(0, 1, steps=1000).unsqueeze(0).to(device)                                  #(Batch) --> float shape
 
             assert encoder_input.size(0) == 1, "Batch size needs to be 1"
 
             if(config["remove_parts"]):              
-                model_out = greedy_decode_timeSeries_paper(model, encoder_input_removed)
+                model_out = greedy_decode_timeSeries_paper(model, encoder_input_removed, time)
             else:
-                model_out = greedy_decode_timeSeries_paper(model, encoder_input)
+                model_out = greedy_decode_timeSeries_paper(model, encoder_input, time)
 
             decoder_input = batch['groundTruth'].to(device)
             decoder_input = (div_term*decoder_input)+min_value
@@ -68,8 +69,8 @@ def run_validation_TimeSeries(model,validation_dl, device, num_examples, config,
                 df.to_csv(f"results_val/val_epoch_{epoch_nr}.csv", index=False)
                 break
 
-def greedy_decode_timeSeries_paper(model, source: torch.Tensor):
-    time = torch.linspace(0, 1, steps=1000).unsqueeze(0)
+def greedy_decode_timeSeries_paper(model, source: torch.Tensor, time: torch.Tensor):
+    
     encoder_output = model.encode(source, None, time)
     
     proj_out = model.project(encoder_output[0,:])           #(seq_len, d_model) -> (seq_len, vocab_size)
