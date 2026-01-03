@@ -119,6 +119,7 @@ def train_model_TimeSeries_paper(config):
     
     #loss function
     loss_fn = nn.CrossEntropyLoss(label_smoothing=config["label_smoothing"]).to(device)
+    loss_grad = nn.MSELoss().to(device)
 
     for epoch in range(initial_epoch, config["num_epochs"]):
         torch.cuda.empty_cache()
@@ -162,12 +163,7 @@ def train_model_TimeSeries_paper(config):
             prediction = proj_output.view(-1, vocab_size)                   #(batch,seq_len, 1) --> (batch * seq_len, tgt_vocab_size)
             lossCE = loss_fn(prediction, groundTruth)                         #calculate cross-entropy-loss
             
-            # _, prediction_indices = torch.max(proj_output,2)
-            # prediction_indices = prediction_indices.to(device)
-            # # prediction_indices[prediction_indices > vocab_size] = 0.0
-            # prediction = i2v[prediction_indices].to(device)
-            # prediction = prediction * div_term.unsqueeze(-1) + min_value.unsqueeze(-1)
-            # prediction_grad = prediction[:,1:] - prediction[:,:-1]
+            
             probs = torch.softmax(proj_output, dim=-1)     # (B,S,V)
 
             # i2v_values: (V,) oder (V,1) als float tensor auf device
@@ -181,12 +177,7 @@ def train_model_TimeSeries_paper(config):
             # groundTruth = groundTruth * div_term.unsqueeze(-1) + min_value.unsqueeze(-1)
             groundTruth_grad = groundTruth[:,1:] - groundTruth[:,:-1]
 
-
-            nom = torch.abs(prediction_grad - groundTruth_grad).sum()
-            denom = torch.abs(groundTruth_grad).sum() + 1e-6
-
-            # lossGradient = nom/denom
-            lossGradient = nom
+            lossGradient = loss_grad(prediction_grad, groundTruth_grad)
             loss = lossCE + config["gradient_loss_weight"] * lossGradient
             batch_iterator.set_postfix({f"loss": f"{loss.item():6.5f}; lossCE: {lossCE.item():6.3f}; lossGrad: {lossGradient.item():6.3f}"})
 

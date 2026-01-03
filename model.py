@@ -344,8 +344,8 @@ class Transformer_Encoder_Interpolation_CE(nn.Module):
 
 #model for interpolation with encoder and index input values; projection Layer projects output to index probability distribution
 def build_encoder_interpolation_uknToken_projection(vocab_size:int,src_seq_len: int, d_model: int = 512, N: int = 6, h: int = 8, dropout: float = 0.1, d_ff: int = 2024)-> Transformer_Encoder_Interpolation_CE:
-    # src_embed = InputEmbedding(d_model, vocab_size)
-    src_embed = InputEmbedding_seperate(d_model, vocab_size, n_freqs=16)
+    src_embed = InputEmbedding(d_model, vocab_size)
+    # src_embed = InputEmbedding_seperate(d_model, vocab_size, n_freqs=16)
     # src_embed = InputEmbedding_seperate2(d_model, vocab_size, n_freqs=16)
     # src_embed = InputEmbedding_common(d_model, vocab_size, n_freqs=16)
 

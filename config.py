@@ -25,7 +25,7 @@ def get_config():
         "model_basename": "Encoder_Interpolation_Discontinuous_",
         "preload": "latest",                                #whether or not to start training with the latest trained version
         "experiment_name": "runs/tmodel",
-        "label_smoothing": 0.1,
+        "label_smoothing": 0.0,
         "gradient_loss_weight": 0.2
     }
 
