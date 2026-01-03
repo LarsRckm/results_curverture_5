@@ -212,12 +212,12 @@ def train_model_TimeSeries_paper(config):
             groundTruth_grad = groundTruth[:,1:] - groundTruth[:,:-1]
 
             lossGradient = loss_grad(prediction_grad, groundTruth_grad)
-            lossGradient = torch.clamp(lossGradient, max=100.0)  # oder einen anderen Wert
 
             g_ce   = grad_norm(lossCE, model)
             g_grad = grad_norm(lossGradient, model)
 
             alpha = (g_ce / (g_grad + 1e-8)).detach()
+            alpha = torch.clamp(alpha, max=1.0)  # Verhindere, dass alpha explodiert
 
             loss = lossCE + alpha * lossGradient
             batch_iterator.set_postfix({f"loss": f"{loss.item():6.5f}; lossCE: {lossCE.item():6.3f}; lossGrad: {lossGradient.item():6.3f}"})
