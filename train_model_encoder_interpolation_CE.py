@@ -212,6 +212,7 @@ def train_model_TimeSeries_paper(config):
             groundTruth_grad = groundTruth[:,1:] - groundTruth[:,:-1]
 
             lossGradient = loss_grad(prediction_grad, groundTruth_grad)
+            lossGradient = torch.clamp(lossGradient, max=100.0)  # oder einen anderen Wert
 
             g_ce   = grad_norm(lossCE, model)
             g_grad = grad_norm(lossGradient, model)
