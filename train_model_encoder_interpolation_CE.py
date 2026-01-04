@@ -27,10 +27,10 @@ def get_ds_timeSeries(config):
     train_dataloader = DataLoader(train_ds, batch_size=config['batch_size'])
     val_dataloader = DataLoader(val_ds, batch_size=1)
 
-    return train_dataloader, val_dataloader, x_values.shape[0], len(v2i_dict)
+    return train_dataloader, val_dataloader, x_values.shape[0], len(v2i_dict),len(v2i_dict) - len(config["extra_tokens"])
 
-def get_model_timeSeries(config, seq_len, vocab_size):
-    model = build_encoder_interpolation_uknToken_projection(vocab_size,seq_len, config["d_model"], dropout=config["dropout"])
+def get_model_timeSeries(config, seq_len, vocab_size_src, vocab_size_tgt):
+    model = build_encoder_interpolation_uknToken_projection(vocab_size_src,vocab_size_tgt,seq_len, config["d_model"], dropout=config["dropout"])
     return model
 
 def run_validation_TimeSeries(model,validation_dl, device, num_examples, config, epoch_nr):
@@ -103,8 +103,8 @@ def train_model_TimeSeries_paper(config):
     os.makedirs("results_train", exist_ok=True)
     os.makedirs("results_val", exist_ok=True)
     
-    train_dataloader, val_dataloader, seq_len, vocab_size = get_ds_timeSeries(config)
-    model = get_model_timeSeries(config, seq_len, vocab_size).to(device)
+    train_dataloader, val_dataloader, seq_len, vocab_size_src, vocab_size_tgt = get_ds_timeSeries(config)
+    model = get_model_timeSeries(config, seq_len, vocab_size_src, vocab_size_tgt).to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config["lr"], eps=1e-9, weight_decay=1e-4)
 
@@ -142,13 +142,10 @@ def train_model_TimeSeries_paper(config):
         global_step = state['global_step']
 
     #recalculating original numbers
-    i2v_dict = index_to_value_dict(config["vocab_size"], config["extra_tokens"])
-    i2v = torch.zeros(config["vocab_size"] + len(config["extra_tokens"]) + 1).to(device)
+    i2v_dict = index_to_value_dict(config["vocab_size"])
+    i2v = torch.zeros(config["vocab_size"] + 1).to(device)
     for k, v in i2v_dict.items():
-        if(v == "ukn"):
-            i2v[int(k)] = 0.0
-        else:
-            i2v[int(k)] = float(v)
+        i2v[int(k)] = float(v)
 
     
     #loss function
@@ -194,7 +191,7 @@ def train_model_TimeSeries_paper(config):
 
 
             groundTruth = batch["groundTruth_indices"].to(device).view(-1)  #(batch,seq_len) --> (batch * seq_len)
-            prediction = proj_output.view(-1, vocab_size)                   #(batch,seq_len, 1) --> (batch * seq_len, tgt_vocab_size)
+            prediction = proj_output.view(-1, vocab_size_tgt)                   #(batch,seq_len, 1) --> (batch * seq_len, tgt_vocab_size)
             lossCE = loss_fn(prediction, groundTruth)                         #calculate cross-entropy-loss
             
 
@@ -211,8 +208,8 @@ def train_model_TimeSeries_paper(config):
             groundTruth = groundTruth * div_term.unsqueeze(-1) + min_value.unsqueeze(-1)
             groundTruth_grad = groundTruth[:,1:] - groundTruth[:,:-1]
 
-            prediction_grad_norm = prediction_grad/(torch.std(prediction_grad))
-            groundTruth_grad_norm = groundTruth_grad/(torch.std(groundTruth_grad))
+            prediction_grad_norm = prediction_grad/(groundTruth_grad.abs().mean(dim=-1, keepdim=True))
+            groundTruth_grad_norm = groundTruth_grad/(groundTruth_grad.abs().mean(dim=-1, keepdim=True))
 
             lossGradient = loss_grad(prediction_grad_norm, groundTruth_grad_norm)
 
@@ -224,10 +221,10 @@ def train_model_TimeSeries_paper(config):
             loss = lossCE + alpha * lossGradient
             batch_iterator.set_postfix({f"loss": f"{loss.item():6.5f}; lossCE: {lossCE.item():6.3f}; lossGrad: {lossGradient.item():6.3f}"})
 
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
             #backpropagate the loss
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
 
             #update the weights

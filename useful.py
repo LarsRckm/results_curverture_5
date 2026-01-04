@@ -34,8 +34,8 @@ def calc_exp(smallest_number):
         step_copy*=10
     return exp
 
-def index_to_value_dict(vocab_size_numbers: int, vocab_extra_tokens: list):
-    total_len = vocab_size_numbers+len(vocab_extra_tokens)
+def index_to_value_dict(vocab_size_numbers: int, vocab_extra_tokens: list = None):
+    total_len = vocab_size_numbers+len(vocab_extra_tokens) if vocab_extra_tokens is not None else vocab_size_numbers
     smallest_number = 1/vocab_size_numbers
     exp = calc_exp(smallest_number)
     number_copy = 0
@@ -46,9 +46,10 @@ def index_to_value_dict(vocab_size_numbers: int, vocab_extra_tokens: list):
         number_copy += smallest_number
         i += 1
     j = i
-    while i<=total_len:
-        dictionary[f"{i}"] = vocab_extra_tokens[i-j]
-        i += 1
+    if(vocab_extra_tokens is not None):
+        while i<=total_len:
+            dictionary[f"{i}"] = vocab_extra_tokens[i-j]
+            i += 1
     
     return dictionary
 
