@@ -73,17 +73,17 @@ def run_validation_TimeSeries(model,validation_dl, device, num_examples, config,
         # gespeicherte Zeitreihen laden und auswerten lassen und heatmap abspeichern
         # erst ohne Maske
         df = pd.read_csv(f"results_val/heat_map_data.csv")
-        encoder_input = torch.tensor(df["noisy_TimeSeries"]).unsqueeze(0).to(device) 
+        encoder_input = torch.tensor(df["noisy_TimeSeries"]).to(device) 
         _, proj_output = greedy_decode_timeSeries_paper(model, encoder_input, None)
-        prob_distribution = np.memmap(f"results_train/prob_distribution_epoch_{epoch_nr}.npy", dtype='float32', mode='w+', shape=proj_output[0,:,:].shape)
-        prob_distribution[:] = proj_output[0,:,:].detach().cpu().numpy()    #(seq_len, vocab_size)
+        prob_distribution = np.memmap(f"results_train/prob_distribution_epoch_{epoch_nr}.npy", dtype='float32', mode='w+', shape=proj_output[:,:].shape)
+        prob_distribution[:] = proj_output[:,:].detach().cpu().numpy()    #(seq_len, vocab_size)
         prob_distribution.flush()
 
         # dann mit Maske 
-        encoder_input_removed = torch.tensor(df["noisy_TimeSeries_removed"]).unsqueeze(0).to(device) 
+        encoder_input_removed = torch.tensor(df["noisy_TimeSeries_removed"]).to(device) 
         _, proj_output = greedy_decode_timeSeries_paper(model, encoder_input_removed, None)
-        prob_distribution = np.memmap(f"results_train/prob_distribution_epoch_masking_{epoch_nr}.npy", dtype='float32', mode='w+', shape=proj_output[0,:,:].shape)
-        prob_distribution[:] = proj_output[0,:,:].detach().cpu().numpy()    #(seq_len, vocab_size)
+        prob_distribution = np.memmap(f"results_train/prob_distribution_epoch_masking_{epoch_nr}.npy", dtype='float32', mode='w+', shape=proj_output[:,:].shape)
+        prob_distribution[:] = proj_output[:,:].detach().cpu().numpy()    #(seq_len, vocab_size)
         prob_distribution.flush()
 
 
