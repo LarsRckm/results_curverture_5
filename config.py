@@ -12,7 +12,7 @@ def get_config():
         # "noise_std": [0,10],                             #[noise_std_min, noise_std_max], noise_std is normal distributed or uniform distributed itself, specify in create_data.py in generate_noisy_data
         "noise_std": ["norm",0,0.15], #noise std is set to be normal or uniform distributed, alternative ["uni", 0.05 meaning 0.05 * max(TimeSeries)-min(TimeSeries), 0.15 meaning 0.15 * max(TimeSeries)-min(TimeSeries)], ["norm", 0 (mean), 0.15 (std, meaning 0.15 * max(TimeSeries)-min(TimeSeries))] 
         "dropout": 0.1,                                     #value for dropout layer in model
-        "train_count":10000,                                    #number of training examples per epoch
+        "train_count":100,                                    #number of training examples per epoch
         "val_count": 100,                                     #number of validation examples per epoch
         "random_number_range": ["norm",0,5],          #y-values are created randomly with normal distribution and given mean_value and std_value, alternative: ["uni", 5(lower border), 10(upper border)]
         "offset": 10,                                       #offset to the lowest and highest border of y_values
