@@ -4,7 +4,7 @@ def get_config():
     return {
         "number_x_values": 1000,                            #time series length
         "extra_tokens": ["ukn"],                            #additional tokens next to normal int index
-        "vocab_size": 100000,                               #number of equally distanced pieces of number range [0,1], encoder interpolation CE 
+        "vocab_size": 50000,                               #number of equally distanced pieces of number range [0,1], encoder interpolation CE 
         "remove_parts": True,                               #whether or not to remove arbitrary parts of the time series (corresponding to the entry "width_array")
         "spline_value": [800000,1100000],                                  #spline value for smooth time series shape, higher value -> more smooth
         "x_lim": [0,1000],                                  #range of x-array for removing parts of time series

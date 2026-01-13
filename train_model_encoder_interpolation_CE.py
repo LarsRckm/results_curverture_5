@@ -28,7 +28,7 @@ def get_ds_timeSeries(config):
     train_dataloader = DataLoader(train_ds, batch_size=config['batch_size'])
     val_dataloader = DataLoader(val_ds, batch_size=1)
 
-    return train_dataloader, val_dataloader, x_values.shape[0], len(v2i_dict),len(v2i_dict) - len(config["extra_tokens"])
+    return train_dataloader, val_dataloader, x_values.shape[0], len(v2i_dict),(len(v2i_dict) - len(config["extra_tokens"]))
 
 def get_model_timeSeries(config, seq_len, vocab_size_src, vocab_size_tgt):
     model = build_encoder_interpolation_uknToken_projection(vocab_size_src,vocab_size_tgt,seq_len, config["d_model"], dropout=config["dropout"])
@@ -73,14 +73,15 @@ def run_validation_TimeSeries(model,validation_dl, device, num_examples, config,
         # gespeicherte Zeitreihen laden und auswerten lassen und heatmap abspeichern
         # erst ohne Maske
         df = pd.read_csv(f"results_val/heat_map_data.csv")
-        encoder_input = torch.tensor(df["noisy_TimeSeries"]).to(device) 
+        encoder_input = torch.tensor(df["noisy_TimeSeries"]).unsqueeze(0).to(device) 
         _, proj_output = greedy_decode_timeSeries_paper(model, encoder_input, None)
+        print(f"proj_output shape: {proj_output[:,:].shape}")
         prob_distribution = np.memmap(f"results_train/prob_distribution_epoch_{epoch_nr}.npy", dtype='float32', mode='w+', shape=proj_output[0,:,:].shape)
         prob_distribution[:] = proj_output[0,:,:].detach().cpu().numpy()    #(seq_len, vocab_size)
         prob_distribution.flush()
 
         # dann mit Maske 
-        encoder_input_removed = torch.tensor(df["noisy_TimeSeries_removed"]).to(device) 
+        encoder_input_removed = torch.tensor(df["noisy_TimeSeries_removed"]).unsqueeze(0).to(device) 
         _, proj_output = greedy_decode_timeSeries_paper(model, encoder_input_removed, None)
         prob_distribution = np.memmap(f"results_train/prob_distribution_epoch_masking_{epoch_nr}.npy", dtype='float32', mode='w+', shape=proj_output[0,:,:].shape)
         prob_distribution[:] = proj_output[0,:,:].detach().cpu().numpy()    #(seq_len, vocab_size)
@@ -208,15 +209,26 @@ def train_model_TimeSeries_paper(config):
             noise_std_copy = noise_std[0]                   #noise_std:     float
 
 
-            groundTruth = batch["groundTruth_indices"].to(device).view(-1)  #(batch,seq_len) --> (batch * seq_len)
+            groundTruth = batch["groundTruth_indices"].to(device)  #(batch,seq_len) --> (batch * seq_len)
+            groundTruth = groundTruth.view(groundTruth.shape[0]*groundTruth.shape[1],1)
             prediction = proj_output.view(-1, vocab_size_tgt)                   #(batch,seq_len, 1) --> (batch * seq_len, tgt_vocab_size)
+            print("prediction", prediction.shape)
+            # prediction_probs = torch.softmax(prediction, dim=-1)     # (B*S,V)
             # lossCE = loss_fn(prediction, groundTruth)                         #calculate cross-entropy-loss
             
 
-            x = torch.arange(config["vocab_size"], device=device).float()
-            prediction_probs = torch.softmax(prediction, dim=-1)     # (B*S,V)
-            groundTruth_probs =  torch.exp(-0.5 * ((x[None, :] - groundTruth) / 1) ** 2)
-            groundTruth_probs = groundTruth_probs / groundTruth_probs.sum(dim=1, keepdim=True)
+            x = torch.ones_like(groundTruth).to(device) * torch.arange(config["vocab_size"] + 1, device=device).float().unsqueeze(0)
+            groundTruth = groundTruth * torch.ones(1, config["vocab_size"]+1, device=device).float()
+            # print("groundTruth", groundTruth.shape)
+            # print("x", x.shape)
+            # print("groundTruth", groundTruth.shape)
+            groundTruth_probs =  torch.exp(-0.5 * ((x - groundTruth) / 1) ** 2)
+            # print("groundTruthprobs", groundTruth_probs.shape)
+            # print("pred NaN groundtruthprobs", torch.isnan(groundTruth_probs).any().item())
+            groundTruth_probs = groundTruth_probs / groundTruth_probs.sum(dim=-1, keepdim=True)
+
+            # print("pred NaN", torch.isnan(prediction).any().item(),
+            #         "pred Inf", torch.isinf(prediction).any().item())
 
             log_p = F.log_softmax(prediction, dim=-1)
             loss = -(groundTruth_probs * log_p).sum(dim=-1).mean()
