@@ -75,7 +75,6 @@ def run_validation_TimeSeries(model,validation_dl, device, num_examples, config,
         df = pd.read_csv(f"results_val/heat_map_data.csv")
         encoder_input = torch.tensor(df["noisy_TimeSeries"]).unsqueeze(0).to(device) 
         _, proj_output = greedy_decode_timeSeries_paper(model, encoder_input, None)
-        print(f"proj_output shape: {proj_output[:,:].shape}")
         prob_distribution = np.memmap(f"results_train/prob_distribution_epoch_{epoch_nr}.npy", dtype='float32', mode='w+', shape=proj_output[0,:,:].shape)
         prob_distribution[:] = proj_output[0,:,:].detach().cpu().numpy()    #(seq_len, vocab_size)
         prob_distribution.flush()
@@ -212,7 +211,7 @@ def train_model_TimeSeries_paper(config):
             groundTruth = batch["groundTruth_indices"].to(device)  #(batch,seq_len) --> (batch * seq_len)
             groundTruth = groundTruth.view(groundTruth.shape[0]*groundTruth.shape[1],1)
             prediction = proj_output.view(-1, vocab_size_tgt)                   #(batch,seq_len, 1) --> (batch * seq_len, tgt_vocab_size)
-            print("prediction", prediction.shape)
+            # print("prediction", prediction.shape)
             # prediction_probs = torch.softmax(prediction, dim=-1)     # (B*S,V)
             # lossCE = loss_fn(prediction, groundTruth)                         #calculate cross-entropy-loss
             
