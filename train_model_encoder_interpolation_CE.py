@@ -1,4 +1,5 @@
 import torch 
+import torch.nn.functional as F
 import torch.nn as nn
 from torch.utils.data import DataLoader
 import pandas as pd
@@ -50,9 +51,9 @@ def run_validation_TimeSeries(model,validation_dl, device, num_examples, config,
             assert encoder_input.size(0) == 1, "Batch size needs to be 1"
 
             if(config["remove_parts"]):              
-                model_out = greedy_decode_timeSeries_paper(model, encoder_input_removed, time)
+                model_out, _ = greedy_decode_timeSeries_paper(model, encoder_input_removed, time)
             else:
-                model_out = greedy_decode_timeSeries_paper(model, encoder_input, time)
+                model_out, _ = greedy_decode_timeSeries_paper(model, encoder_input, time)
 
             decoder_input = batch['groundTruth'].to(device)
             decoder_input = (div_term*decoder_input)+min_value
@@ -68,6 +69,23 @@ def run_validation_TimeSeries(model,validation_dl, device, num_examples, config,
             if count == num_examples:
                 df.to_csv(f"results_val/val_epoch_{epoch_nr}.csv", index=False)
                 break
+        
+        # gespeicherte Zeitreihen laden und auswerten lassen und heatmap abspeichern
+        # erst ohne Maske
+        df = pd.read_csv(f"results_val/heat_map_data.csv")
+        encoder_input = torch.tensor(df["noisy_TimeSeries"]).to(device) 
+        _, proj_output = greedy_decode_timeSeries_paper(model, encoder_input, None)
+        prob_distribution = np.memmap(f"results_train/prob_distribution_epoch_{epoch_nr}.npy", dtype='float32', mode='w+', shape=proj_output[0,:,:].shape)
+        prob_distribution[:] = proj_output[0,:,:].detach().cpu().numpy()    #(seq_len, vocab_size)
+        prob_distribution.flush()
+
+        # dann mit Maske 
+        encoder_input_removed = torch.tensor(df["noisy_TimeSeries_removed"]).to(device) 
+        _, proj_output = greedy_decode_timeSeries_paper(model, encoder_input_removed, None)
+        prob_distribution = np.memmap(f"results_train/prob_distribution_epoch_masking_{epoch_nr}.npy", dtype='float32', mode='w+', shape=proj_output[0,:,:].shape)
+        prob_distribution[:] = proj_output[0,:,:].detach().cpu().numpy()    #(seq_len, vocab_size)
+        prob_distribution.flush()
+
 
 def greedy_decode_timeSeries_paper(model, source: torch.Tensor, time: torch.Tensor):
     
@@ -77,7 +95,7 @@ def greedy_decode_timeSeries_paper(model, source: torch.Tensor, time: torch.Tens
 
     _, indices = torch.max(proj_out, dim=1)                 #(batch, seq_len, vocab_size) -> (seq_len)
     
-    return indices
+    return indices, proj_out
 
 
 def grad_norm(loss, model: nn.Module):
@@ -192,34 +210,42 @@ def train_model_TimeSeries_paper(config):
 
             groundTruth = batch["groundTruth_indices"].to(device).view(-1)  #(batch,seq_len) --> (batch * seq_len)
             prediction = proj_output.view(-1, vocab_size_tgt)                   #(batch,seq_len, 1) --> (batch * seq_len, tgt_vocab_size)
-            lossCE = loss_fn(prediction, groundTruth)                         #calculate cross-entropy-loss
+            # lossCE = loss_fn(prediction, groundTruth)                         #calculate cross-entropy-loss
             
 
-            probs = torch.softmax(proj_output, dim=-1)     # (B,S,V)
+            x = torch.arange(config["vocab_size"], device=device).float()
+            prediction_probs = torch.softmax(prediction, dim=-1)     # (B*S,V)
+            groundTruth_probs =  torch.exp(-0.5 * ((x[None, :] - groundTruth) / 1) ** 2)
+            groundTruth_probs = groundTruth_probs / groundTruth_probs.sum(dim=1, keepdim=True)
+
+            log_p = F.log_softmax(prediction, dim=-1)
+            loss = -(groundTruth_probs * log_p).sum(dim=-1).mean()
+
 
             # i2v_values: (V,) oder (V,1) als float tensor auf device
             # Erwartungswert: pred_value[b,s] = sum_v probs[b,s,v] * i2v_values[v]
-            pred_value = (probs * i2v.view(1,1,-1)).sum(dim=-1)   # (B,S)
+            # pred_value = (probs * i2v.view(1,1,-1)).sum(dim=-1)   # (B,S)
 
-            pred_value = pred_value * div_term.unsqueeze(-1) + min_value.unsqueeze(-1)
-            prediction_grad = pred_value[:, 1:] - pred_value[:, :-1]
+            # pred_value = pred_value * div_term.unsqueeze(-1) + min_value.unsqueeze(-1)
+            # prediction_grad = pred_value[:, 1:] - pred_value[:, :-1]
 
-            groundTruth = batch["groundTruth"].to(device)
-            groundTruth = groundTruth * div_term.unsqueeze(-1) + min_value.unsqueeze(-1)
-            groundTruth_grad = groundTruth[:,1:] - groundTruth[:,:-1]
+            # groundTruth = batch["groundTruth"].to(device)
+            # groundTruth = groundTruth * div_term.unsqueeze(-1) + min_value.unsqueeze(-1)
+            # groundTruth_grad = groundTruth[:,1:] - groundTruth[:,:-1]
 
-            prediction_grad_norm = prediction_grad/(groundTruth_grad.abs().mean(dim=-1, keepdim=True))
-            groundTruth_grad_norm = groundTruth_grad/(groundTruth_grad.abs().mean(dim=-1, keepdim=True))
+            # prediction_grad_norm = prediction_grad/(groundTruth_grad.abs().mean(dim=-1, keepdim=True))
+            # groundTruth_grad_norm = groundTruth_grad/(groundTruth_grad.abs().mean(dim=-1, keepdim=True))
 
-            lossGradient = loss_grad(prediction_grad_norm, groundTruth_grad_norm)
+            # lossGradient = loss_grad(prediction_grad_norm, groundTruth_grad_norm)
 
-            g_ce   = grad_norm(lossCE, model)
-            g_grad = grad_norm(lossGradient, model)
+            # g_ce   = grad_norm(lossCE, model)
+            # g_grad = grad_norm(lossGradient, model)
 
-            alpha = (g_ce / (g_grad + 1e-8)).detach()
+            # alpha = (g_ce / (g_grad + 1e-8)).detach()
 
-            loss = lossCE + alpha * lossGradient
-            batch_iterator.set_postfix({f"loss": f"{loss.item():6.5f}; lossCE: {lossCE.item():6.3f}; lossGrad: {lossGradient.item():6.3f}"})
+            # loss = lossCE + alpha * lossGradient
+            # loss = 
+            batch_iterator.set_postfix({f"loss": f"{loss.item():6.5f}; loss_Gaussian_CE: {loss.item():6.3f}; "})
 
 
             #backpropagate the loss

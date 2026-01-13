@@ -155,7 +155,8 @@ def remove_parts_of_graph_encoder(x_array, y_array, width_array, offset, x_lim):
                 ) or any(
                     min(pair[0] - offset, pair[1] + offset) < (location - width) < max(pair[0] - offset, pair[1] + offset)
                     for pair in location_width['min_max_value'].tolist()
-                ):
+                ) or any(
+                    (location - width) < min(pair[0], pair[1]) and (location + width) > max(pair[0], pair[1]) for pair in location_width['min_max_value'].tolist()):
                     count += 1
                     location = np.random.uniform(x_lim[0] + offset, x_lim[1] - offset)
 

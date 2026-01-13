@@ -40,10 +40,10 @@ class TimeSeriesDataset_Interpolation_roundedInput(Dataset):
 
         #remove arbitrary parts of timeseries
         mask = remove_parts_of_graph_encoder(self.x_values,y_noise_spline, self.config["width_array_encoder"], self.config["offset"], self.config["x_lim"])
-        mask = ~mask
-        #mask index 1 -> keep
-        #mask index 0 -> remove
-        mask_indices = np.where(mask == 0)[0]
+        # mask = ~mask
+        #mask index 0 -> keep
+        #mask index 1 -> remove
+        mask_indices = np.where(mask == 1)[0]
 
         #parameter for min-max scaling
         div_term = (max_value-min_value)          
