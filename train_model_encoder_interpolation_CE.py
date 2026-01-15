@@ -221,10 +221,10 @@ def train_model_TimeSeries_paper(config):
             # print("groundTruth", groundTruth.shape)
             # print("x", x.shape)
             # print("groundTruth", groundTruth.shape)
-            groundTruth_probs =  torch.exp(-0.5 * ((x - groundTruth) / 1) ** 2)
+            groundTruth_probs =  1/(10*np.sqrt(2*np.pi)) *torch.exp(-0.5 * ((x - groundTruth) / 10) ** 2)
             # print("groundTruthprobs", groundTruth_probs.shape)
             # print("pred NaN groundtruthprobs", torch.isnan(groundTruth_probs).any().item())
-            groundTruth_probs = groundTruth_probs / groundTruth_probs.sum(dim=-1, keepdim=True)
+            # groundTruth_probs = groundTruth_probs / groundTruth_probs.sum(dim=-1, keepdim=True)
 
             # print("pred NaN", torch.isnan(prediction).any().item(),
             #         "pred Inf", torch.isinf(prediction).any().item())
